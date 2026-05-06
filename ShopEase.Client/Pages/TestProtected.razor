@@ -1,0 +1,38 @@
+@page "/test-protected"
+@using ShopEase.Client.Services
+@inject UserService UserService
+
+<h3>Protected API Test</h3>
+
+<button @onclick="CallProtected">Call Protected Endpoint</button>
+
+@if (!string.IsNullOrEmpty(message))
+{
+    <p>@message</p>
+}
+
+@code {
+    private string? message;
+
+    private async Task CallProtected()
+    {
+        try
+        {
+            // Call any protected endpoint, e.g. GetUsers
+            var users = await UserService.GetUsers();
+
+            if (users != null)
+            {
+                message = $"Protected call succeeded. Users count: {users.Count}";
+            }
+            else
+            {
+                message = "Protected call returned null.";
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"Protected call failed: {ex.Message}";
+        }
+    }
+}

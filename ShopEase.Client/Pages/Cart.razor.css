@@ -1,0 +1,65 @@
+/* Desktop: keep Bootstrap defaults */
+/* Scoped override for Cart only */
+.table tr td input.form-control.quantity-box {
+    width: 70px !important;
+    min-width: 70px !important;
+    max-width: 70px !important;
+    text-align: center;
+    display: inline-block !important;
+    box-sizing: border-box;
+    padding: 0.25rem;
+    appearance: textfield;
+    -moz-appearance: textfield;
+}
+
+/* Mobile & tablet layout */
+@media (max-width: 768px) {
+    .table, .table tr, .table td, .table tbody {
+        display: block;
+        width: 100%;
+    }
+
+    .table thead { display: none; }
+
+    .table tr {
+        margin: 0 auto 1rem;
+        max-width: 95%;
+        border: 1px solid #eee;
+        border-radius: 10px;
+        padding: 0.75rem;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+        background: #fff;
+    }
+
+/* First row: checkbox + product name side by side */
+    .table tr td:first-child,
+    .table tr td:nth-child(2) {
+        display: inline-block;
+        vertical-align: middle;
+        border: none;
+        padding: 0.4rem 0;
+    }
+
+    .table tr td:first-child {
+        width: auto;
+        margin-right: 0.5rem;
+    }
+
+    .table tr td:nth-child(2) {
+        font-weight: 600;
+        color: #333;
+        width: calc(100% - 2rem); /* take remaining space */
+    }
+
+
+    /* Labels for stacked rows */
+    .table tr td:nth-child(3)::before { content: "Quantity : "; font-weight: 600; margin-right: 0.1rem; }
+    .table tr td:nth-child(4)::before { content: "Price : "; font-weight: 600; margin-right: 0.3rem; }
+    .table tr td:nth-child(5)::before { content: "Total : "; font-weight: 600; margin-right: 0.3rem; }
+
+    .table tr td:nth-child(5) { font-weight: 700; color: #222; }
+
+    /* Remove button full width */
+    .table tr td:last-child { display: block; text-align: center; border: none; padding-top: 0.6rem; }
+    .btn-danger { width: 100%; font-size: 0.95rem; font-weight: 600; padding: 0.6rem; }
+}

@@ -1,0 +1,89 @@
+@page "/register"
+@using ShopEase.Shared.DTOs
+@using ShopEase.Client.Services
+
+@inject UserService UserService
+@inject NavigationManager Navigation
+
+<div class="auth-page">
+    <div class="auth-panel register-panel">
+        <div class="auth-panel-header">
+            <span class="brand-chip">ShopEase</span>
+            <h3>Create your account</h3>
+            <p class="auth-panel-copy">Build your shopping profile and unlock personalized product recommendations.</p>
+        </div>
+
+        @if (!string.IsNullOrEmpty(successMessage))
+        {
+            <div class="alert alert-success">@successMessage</div>
+        }
+<div class="auth-form-container">
+        <EditForm Model="@registerModel" OnValidSubmit="HandleRegister" class="auth-form" key="@registerModel">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <div class="form-group auth-input-group">
+                <label>Email</label>
+                <InputText @bind-Value="registerModel.Email"
+                           class="form-control"
+                           autocomplete="off" />
+            </div>
+
+            <div class="form-group auth-input-group">
+                <label>Username</label>
+                <InputText @bind-Value="registerModel.UserName"
+                           class="form-control"
+                           autocomplete="off" />
+            </div>
+
+            <div class="form-group auth-input-group">
+                <label>Password</label>
+                <InputText @bind-Value="registerModel.Password"
+                           type="password"
+                           class="form-control"
+                           autocomplete="new-password" />
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100">Create account</button>
+        </EditForm>
+</div>
+        <div class="auth-footer">
+            <span>Already have an account?</span>
+            <NavLink href="/login">Login here</NavLink>
+        </div>
+    </div>
+</div>
+
+@code {
+    private RegisterRequest registerModel = new RegisterRequest();
+    private string? successMessage;
+
+    private async Task HandleRegister()
+{
+    var success = await UserService.RegisterAsync(registerModel);
+    if (success)
+    {
+       // ✅ Show success message with username
+        successMessage = $"Registration successful for {registerModel.UserName}! Redirecting to login...";
+        Console.WriteLine(successMessage); // Log for debugging
+
+        // ✅ Clear fields explicitly
+        registerModel.Email = string.Empty;
+        registerModel.UserName = string.Empty;
+        registerModel.Password = string.Empty;
+
+        // ✅ Force UI refresh
+        StateHasChanged();
+
+        // ✅ Wait briefly, then redirect
+        await Task.Delay(2000);
+        Navigation.NavigateTo("/login", forceLoad: true);
+    }
+    else
+    {
+        successMessage = "Registration failed. Please try again.";
+        StateHasChanged();
+    }
+}
+
+}

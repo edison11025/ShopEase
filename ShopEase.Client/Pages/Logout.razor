@@ -1,0 +1,22 @@
+@page "/logout"
+@using Microsoft.AspNetCore.Components.Authorization
+@using ShopEase.Client.Services
+
+@inject NavigationManager NavManager
+@inject AuthenticationStateProvider AuthStateProvider
+
+<h3>Logging out...</h3>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        // Assuming you have a custom AuthStateProvider with a Logout method
+        if (AuthStateProvider is CustomAuthStateProvider customProvider)
+        {
+            await customProvider.LogoutAsync();
+        }
+
+        // ✅ Redirect to homepage (ProductList.razor is @page "/")
+        NavManager.NavigateTo("/", forceLoad: true);
+    }
+}

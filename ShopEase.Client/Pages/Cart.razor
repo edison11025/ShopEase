@@ -1,0 +1,171 @@
+@page "/cart"
+@using ShopEase.Shared.Models
+@using ShopEase.Shared.DTOs
+
+@using ShopEase.Client.Services
+@using Microsoft.AspNetCore.Components.Authorization
+@inject CartService CartService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager NavManager
+
+<h3>Your Cart</h3>
+
+@if (cartItems == null)
+{
+    <p>Loading...</p>
+}
+else if (!cartItems.Any())
+{
+    <p>Your cart is empty.</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Select</th>
+                <th>Product</th>
+                <th>Quantity</th>
+                <th>Price</th>
+                <th>Total</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in cartItems)
+            {
+                <tr>
+                    <td>
+                        <input type="checkbox"
+                            checked="@item.IsSelected"
+                            @onchange="async e => await ToggleSelection(item, e)" />
+                    </td>
+
+                    <td>@item.ProductName</td>
+<td>
+    <InputNumber class="form-control quantity-box"
+                 @bind-Value="item.Quantity"
+                 Min="1"
+                 @oninput="async e => await UpdateQuantity(item.CartItemId, ParseQuantity(e.Value))" />
+</td>
+
+
+
+
+
+                    <td>$@item.Price</td>
+                    <td>$@item.TotalPrice</td>
+                    <td>
+                        <button class="btn btn-danger" @onclick="() => RemoveItem(item.CartItemId)">Remove</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <h4>Total: $@totalPrice</h4>
+}
+
+@code {
+   private List<CartItemResponseDto>? cartItems;
+
+    private decimal totalPrice;
+
+    // first, we check if the user is authenticated. If not, we redirect to the login page. If authenticated, we fetch the cart items for the user and calculate the total price.
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+       if (user?.Identity == null || !user.Identity.IsAuthenticated)
+
+        {
+            var returnUrl = NavManager.ToBaseRelativePath(NavManager.Uri);
+            NavManager.NavigateTo($"/login?returnUrl={returnUrl}", forceLoad: true);
+            return;
+        }
+
+        var userIdClaim = user?.FindFirst("userId")?.Value;   // if authenticated, find the userId. then use UserID to fetch his/her cart
+        if (string.IsNullOrEmpty(userIdClaim))
+        {
+            cartItems = new List<CartItemResponseDto>();
+            return;
+        }
+
+        int userId = int.Parse(userIdClaim);
+        cartItems = await CartService.GetCartAsync();  //this will fetch cart based on userID
+
+        await RecalculateTotal();
+    }
+
+    // This method recalculates the total price of the selected items in the cart. It first gathers the IDs of the selected items, then calls the CartService to calculate the total based on those IDs and the user's ID. Finally, it updates the UI with the new total price.
+    private async Task RecalculateTotal()
+    {
+        var selectedIds = cartItems?.Where(ci => ci.IsSelected).Select(ci => ci.CartItemId).ToList() ?? new();
+        if (!selectedIds.Any())
+        {
+            totalPrice = 0;
+            return;
+        }
+
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        var userIdClaim = user?.FindFirst("userId")?.Value;
+            if (!int.TryParse(userIdClaim, out int userId))
+            {
+                cartItems = new List<CartItemResponseDto>();
+                totalPrice = 0;
+                return;
+            }
+
+        totalPrice = await CartService.CalculateTotalAsync(selectedIds);
+    }
+
+    // This method updates the quantity of a specific cart item. It calls the CartService to update the quantity in the backend, and if successful, it updates the local cart item with the new quantity and total price. After updating, it recalculates the total price for the cart.
+    private async Task UpdateQuantity(int cartItemId, int quantity)
+    {
+        var updated = await CartService.UpdateCartItemAsync(cartItemId, quantity);
+        if (updated != null)
+        {
+            var item = cartItems?.FirstOrDefault(ci => ci.CartItemId == cartItemId);
+            if (item != null)
+            {
+                item.Quantity = updated.Quantity;
+                item.TotalPrice = updated.TotalPrice;
+            }
+        }
+        await RecalculateTotal();
+    }
+
+    // This helper method parses the quantity input from the user. It ensures that the input is a valid integer and defaults to 1 if the input is invalid or null.
+    private int ParseQuantity(object? value)
+    {
+        if (value == null) return 1;
+        if (int.TryParse(value.ToString(), out var qty))
+            return qty;
+        return 1;
+    }
+
+    private async Task RemoveItem(int cartItemId)
+    {
+        await CartService.RemoveCartItemAsync(cartItemId);
+        cartItems?.RemoveAll(ci => ci.CartItemId == cartItemId);
+        await RecalculateTotal();
+    }
+
+    // to check/uncheck items in the cart and persist the selection state in the database
+    private async Task ToggleSelection(CartItemResponseDto item, ChangeEventArgs e)
+{
+    item.IsSelected = e.Value is bool b && b;
+
+    var updated = await CartService.ToggleSelectionAsync(item.CartItemId, item.IsSelected);
+    if (updated != null)
+    {
+        // Map ToggleSelectionDto back into the CartItemResponseDto
+        item.IsSelected = updated.IsSelected;
+        item.TotalPrice = updated.ItemTotal;   // update per‑item total
+    }
+
+    await RecalculateTotal(); // still needed for cart‑wide consistency
+}
+}

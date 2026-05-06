@@ -1,0 +1,99 @@
+@page "/product/{id:int}"
+@using ShopEase.Shared.Models
+@using ShopEase.Client.Services
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@using ShopEase.Shared.DTOs
+@inject ProductService ProductService
+@inject CartService CartService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager NavManager
+
+<h3>Product Details</h3>
+
+@if (product == null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <div class="card">
+        <img src="@(!string.IsNullOrEmpty(product.ImageUrl) ? product.ImageUrl : "placeholder.png")"
+             class="card-img-top" alt="@product.Name" />
+
+        <div class="card-body">
+            <h5 class="card-title">@product.Name</h5>
+            <p class="card-text">@product.Description</p>
+            <p>Price: $@product.Price</p>
+            <p>Stock: @product.Stock</p>
+             <p><strong>Category:</strong> @product.Category</p>
+
+    @if (!string.IsNullOrEmpty(product.Color))
+    {
+        <p><strong>Color:</strong> @product.Color</p>
+    }
+
+    @if (!string.IsNullOrEmpty(product.Size))
+    {
+        <p><strong>Size:</strong> @product.Size</p>
+    }
+
+    @if (!string.IsNullOrEmpty(product.ImageUrl))
+    {
+        <p><strong>Image URL:</strong> @product.ImageUrl</p>
+    }
+
+            <div class="mt-3">
+                <label>Quantity:</label>
+                <InputNumber class="form-control quantity-box" @bind-Value="quantity" Min="1" Max="@product.Stock" />
+                <button class="btn btn-primary" @onclick="AddToCart">Add to Cart</button>
+            </div>
+
+            @if (!string.IsNullOrEmpty(feedbackMessage))
+            {
+                <p class="text-success mt-2">@feedbackMessage</p>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public int id { get; set; }
+    private Product? product;
+    private int quantity = 1;
+    private string? feedbackMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        product = (await ProductService.GetProductsAsync())   //showing product details from using Service which fetched from db
+                  .FirstOrDefault(p => p.ProductId == id);
+    }
+
+    private async Task AddToCart()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user?.Identity == null || !user.Identity.IsAuthenticated)
+        {
+            var returnUrl = NavManager.ToBaseRelativePath(NavManager.Uri);
+            NavManager.NavigateTo($"/login?returnUrl={returnUrl}", forceLoad: true);
+            return;
+        }
+
+
+        var newItem = new CartItemDto
+        {
+            ProductId = product!.ProductId,
+            Quantity = quantity,
+            Price = product.Price,
+            TotalPrice = product.Price * quantity
+        };
+
+        var result = await CartService.AddToCartAsync(newItem);
+
+        feedbackMessage = result != null
+            ? $"{product.Name} (x{quantity}) added to cart!"
+            : "Error adding product to cart.";
+    }
+}

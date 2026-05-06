@@ -1,0 +1,104 @@
+@page "/login"
+@using ShopEase.Client.Services
+@using Microsoft.AspNetCore.Components.Authorization
+@using ShopEase.Shared.DTOs
+
+
+@inject AuthenticationStateProvider AuthStateProvider
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+
+
+<div class="auth-page">
+    <div class="auth-panel login-panel">
+        <div class="auth-panel-header">
+            <span class="brand-chip">ShopEase</span>
+            <h3>Welcome back</h3>
+            <p class="auth-panel-copy">Sign in to continue shopping, manage your cart, and checkout faster.</p>
+        </div>
+
+<div class="auth-form-container">
+        <EditForm Model="@loginModel" OnValidSubmit="HandleLogin" autocomplete="off" class="auth-form">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <!-- Dummy hidden fields to absorb autofill -->
+            <input type="text" style="display:none" autocomplete="username" />
+            <input type="password" style="display:none" autocomplete="new-password" />
+
+            <div class="form-group auth-input-group">
+                <label>Email</label>
+                <InputText @bind-Value="loginModel.Email" class="form-control" autocomplete="off" name="no-autofill-email" />
+            </div>
+
+            <div class="form-group auth-input-group">
+                <label>Password</label>
+                <InputText @bind-Value="loginModel.Password" type="password" class="form-control" autocomplete="new-password" name="no-autofill-password" />
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100">Login</button>
+        </EditForm>
+    </div>    
+
+        <div class="auth-footer">
+            <span>Don't have an account?</span>
+            <NavLink href="/register">Create one</NavLink>
+        </div>
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger">@errorMessage</div>
+        }
+    </div>
+</div>
+
+@code {
+    private LoginRequest loginModel = new();
+    private string errorMessage = string.Empty; // initialized
+
+    private async Task HandleLogin()
+    {
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/user/login", loginModel);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<LoginResponse>();
+
+                if (result != null)
+                {
+                    // Store JWT + Refresh Token in localStorage
+                    await LocalStorage.SetItemAsync("jwt", result.JwtToken);
+                    await LocalStorage.SetItemAsync("refreshToken", result.RefreshToken);
+
+                    // ✅ Notify Blazor that user is authenticated
+                    if (AuthStateProvider is CustomAuthStateProvider customProvider)
+                    {
+                        customProvider.NotifyUserAuthentication(result.JwtToken);
+                    }
+
+                    // Redirect to home or product page
+                    Navigation.NavigateTo("/");
+                }
+                else
+                {
+                    errorMessage = "Login response was empty.";
+                }
+            }
+            else
+            {
+                errorMessage = "Invalid email or password.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Login failed: {ex.Message}";
+        }
+    }
+
+  
+
+   
+}

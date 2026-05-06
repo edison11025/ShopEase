@@ -1,0 +1,50 @@
+@page "/"
+@using ShopEase.Shared.Models
+@using ShopEase.Client.Services
+@using ShopEase.Shared.DTOs
+@inject ProductService ProductService
+
+<h3 class="mb-4">Products</h3>
+
+@if (products == null)
+{
+    <div class="alert alert-info">Loading products...</div>
+}
+else if (!products.Any())
+{
+    <div class="alert alert-warning">No products available.</div>
+}
+else
+{
+    <div class="row g-4">
+        @foreach (var product in products)
+        {
+            <div class="col-lg-3 col-md-4 col-sm-6">
+                @{
+                    string productUrl = $"/product/{product.ProductId}";
+                }
+                <NavLink class="text-decoration-none" href="@productUrl">
+                    <div class="card h-100 shadow-sm border-0 product-card-wrapper">
+                        <ProductCard Product="product" />
+                    </div>
+                </NavLink>
+            </div>
+        }
+    </div>
+}
+@code {
+    private List<Product>? products;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            products = await ProductService.GetProductsAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching products: {ex.Message}");
+            products = new List<Product>(); // fallback to empty list
+        }
+    }
+}

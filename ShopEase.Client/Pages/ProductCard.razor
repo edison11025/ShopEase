@@ -1,0 +1,100 @@
+@using Microsoft.AspNetCore.Components.Authorization
+
+@using  ShopEase.Client.Services
+
+@using ShopEase.Shared.Models
+
+@using System.Security.Claims
+
+@using ShopEase.Shared.DTOs
+
+
+
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager NavManager
+@inject CartService CartService
+
+<div class="product-card">
+    <div class="product-image">
+       <img src="@(!string.IsNullOrEmpty(Product.ImageUrl) ? Product.ImageUrl : "placeholder.png")"
+         class="card-img-top" alt="@Product.Name" />
+    </div>
+
+    <div class="product-details">
+        <h3 class="product-name">@Product.Name</h3>
+        <p class="product-price">Price: $@Product.Price</p>
+        <p class="product-category">Category: @Product.Category</p>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public Product Product { get; set; } = new Product();
+
+     // ------------------------------------------------------------
+    // NOTE:
+    // Cart logic (quantity, feedbackMessage, AddToCart method)
+    // has been intentionally removed from ProductCard.
+    // Professional e-commerce UX keeps product cards clean
+    // (Image, Name, Price, Category only).
+    // Quantity selection and Add to Cart are handled
+    // in ProductDetail.razor instead.
+    //
+    // Future enhancement:
+    // Uncomment the code below if you want to enable
+    // "Quick Add to Cart" directly from product cards.
+    // ------------------------------------------------------------
+
+    /*
+
+    private int quantity = 1;
+    private string? feedbackMessage;
+    private async Task AddToCart(Product product)
+    {
+        // Check authentication state
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;   //received from CustomAuthStateProvider.GetAuthenticationStateAsync() this "user" contains : email, userId and role
+
+        if (user?.Identity == null || !user.Identity.IsAuthenticated)  // check if email, userId and role is authenticated
+        {
+            // Redirect to login with returnUrl back to this product
+            var returnUrl = NavManager.ToBaseRelativePath(NavManager.Uri);
+            NavManager.NavigateTo($"/login?returnUrl={returnUrl}", forceLoad: true);
+            return;
+        }
+
+        // Get userId from claims (adjust claim type to match your setup)
+        var userIdClaim = user.FindFirst("userId")?.Value; // or "userid" contained in "user" which store :email, userId and role
+        var roleClaim = user.FindFirst(ClaimTypes.Role)?.Value;
+        if (string.IsNullOrEmpty(userIdClaim))
+        {
+            Console.WriteLine("User ID claim missing.");
+            return;
+        }
+
+        int userId = int.Parse(userIdClaim);
+
+        // Build CartItem
+        var newItem = new CartItemDto   // populate or wrap and ties selected product with userID
+        {
+            UserId = userId,                  //result from FindFirst() and int.Parse(userIdClaim);
+            ProductId = product.ProductId,
+            Quantity = quantity,
+            Price = product.Price,
+            TotalPrice = product.Price * quantity
+        };
+    
+        // Call CartService
+        var result = await CartService.AddToCartAsync(newItem);     // send populated cartitem into CartController with help of CartService
+
+        if (result != null)
+        {
+            feedbackMessage = $"{product.Name} (x{quantity}) added to cart!";
+        }
+        else
+        {
+            feedbackMessage = "Error adding product to cart.";
+        }
+    }
+    */
+}

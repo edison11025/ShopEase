@@ -1,0 +1,136 @@
+﻿@inherits LayoutComponentBase
+
+@using Microsoft.AspNetCore.Components.Authorization
+@using ShopEase.Client.Services
+@using System.Security.Claims
+
+@implements IDisposable
+
+
+@inject CartService CartService
+@inject AuthenticationStateProvider AuthStateProvider
+
+
+<div class="page">
+    <div class="sidebar">
+        <nav class="nav flex-column">
+            <!-- Cart button always visible -->
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="/cart" Match="NavLinkMatch.All">
+                    <span class="bi bi-cart-fill" aria-hidden="true"></span> Cart (@cartCount)
+                </NavLink>
+            </div>
+
+            <!-- Conditional auth links -->
+            <AuthorizeView>
+                <Authorized Context="authContext">
+                    <div class="nav-item px-3">
+                        <span class="nav-text">Welcome, @authContext.User.Identity?.Name</span>
+                    </div>
+
+                    <!-- ✅ Admin-only Add Product link -->
+                    <AuthorizeView Roles="Admin" Context="adminContext">
+                        <div class="nav-item px-3">
+                            <NavLink class="nav-link" href="/addproduct" Match="NavLinkMatch.All">
+                                <span class="bi bi-plus-circle-fill" aria-hidden="true"></span> Add Product
+                            </NavLink>
+                        </div>
+                    </AuthorizeView>
+
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="/logout" Match="NavLinkMatch.All">
+                            <span class="bi bi-box-arrow-right" aria-hidden="true"></span> Logout
+                        </NavLink>
+                    </div>
+                </Authorized>
+
+                <NotAuthorized>
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="/register" Match="NavLinkMatch.All">
+                            <span class="bi bi-person-plus-fill" aria-hidden="true"></span> Register
+                        </NavLink>
+                    </div>
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="/login" Match="NavLinkMatch.All">
+                            <span class="bi bi-door-open-fill" aria-hidden="true"></span> Login
+                        </NavLink>
+                    </div>
+                </NotAuthorized>
+            </AuthorizeView>
+
+            <!-- Your existing navigation menu -->
+            <NavMenu />
+        </nav>
+    </div>
+
+    <main>
+        <div class="top-row px-4">
+            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+        </div>
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
+
+@code {
+    private int cartCount;
+    private ClaimsPrincipal? user;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // ✅ Subscribe to cart change notifications
+        CartService.OnCartChanged += HandleCartChanged;
+
+        // ✅ Subscribe to authentication state changes
+        AuthStateProvider.AuthenticationStateChanged += HandleAuthStateChanged;
+
+        // Initial load
+        await RefreshCartCount();
+    }
+
+    private async void HandleCartChanged()
+    {
+        await RefreshCartCount();
+        StateHasChanged(); // force re-render
+    }
+
+    // ✅ New handler for login/logout events
+    private async void HandleAuthStateChanged(Task<AuthenticationState> task)
+    {
+        try
+        {
+            await RefreshCartCount();
+            StateHasChanged(); // force re-render after login/logout
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Auth state change error: {ex.Message}");
+            cartCount = 0;
+        }
+    }
+
+    private async Task RefreshCartCount()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        user = authState.User;
+
+        var userIdClaim = user?.FindFirst("userId")?.Value;
+        if (!string.IsNullOrEmpty(userIdClaim))
+        {
+            cartCount = await CartService.GetCartCountAsync();
+        }
+        else
+        {
+            cartCount = 0;
+        }
+    }
+
+    // ✅ Explicit cleanup
+    public void Dispose()
+    {
+        CartService.OnCartChanged -= HandleCartChanged;
+        AuthStateProvider.AuthenticationStateChanged -= HandleAuthStateChanged;
+    }
+}
