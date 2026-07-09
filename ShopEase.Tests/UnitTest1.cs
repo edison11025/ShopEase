@@ -1,8 +1,11 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.Reflection;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 using ShopEase.Server.Controllers;
 using ShopEase.Server.Data;
 using ShopEase.Shared.DTOs;
@@ -23,7 +26,7 @@ public class UserControllerTests
             })
             .Build();
 
-        return new UserController(context, configuration, new PasswordHasher<User>());
+        return new UserController(context, configuration, new PasswordHasher<User>(), NullLogger<UserController>.Instance);
     }
 
     private static ShopDbContext CreateContext()
@@ -192,5 +195,21 @@ public class UserControllerTests
         var result = await controller.Register(request);
 
         Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
+    public void GetUsers_Endpoint_IsProtected_ForAdminRole()
+    {
+        var method = typeof(UserController).GetMethod(nameof(UserController.GetUsers));
+
+        Assert.NotNull(method);
+
+        var authorizeAttribute = method!
+            .GetCustomAttributes(typeof(AuthorizeAttribute), inherit: true)
+            .Cast<AuthorizeAttribute>()
+            .SingleOrDefault();
+
+        Assert.NotNull(authorizeAttribute);
+        Assert.Equal("Admin", authorizeAttribute!.Roles);
     }
 }

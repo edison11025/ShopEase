@@ -13,7 +13,7 @@ using System.Threading.Tasks;
 using System;
 using ShopEase.Shared.DTOs;
 using Microsoft.AspNetCore.Authorization;
-
+using Microsoft.Extensions.Logging;
 
 namespace ShopEase.Server.Controllers
 {
@@ -24,12 +24,14 @@ namespace ShopEase.Server.Controllers
         private readonly ShopDbContext _context;
         private readonly IConfiguration _config;
         private readonly IPasswordHasher<User> _hasher;
+        private readonly ILogger<UserController> _logger;
 
-        public UserController(ShopDbContext context, IConfiguration config, IPasswordHasher<User> hasher)
+        public UserController(ShopDbContext context, IConfiguration config, IPasswordHasher<User> hasher, ILogger<UserController> logger)
         {
             _context = context;
             _config = config;
             _hasher = hasher;
+            _logger = logger;
         }
 
 
@@ -47,6 +49,24 @@ namespace ShopEase.Server.Controllers
     return currentUserId == targetUserId || roleClaim == "Admin";
 }
 
+        private void LogAccess(string endpointName)
+        {
+            var userIdClaim = User.FindFirst("userId")?.Value ?? "unknown";
+            var emailClaim = User.FindFirst(ClaimTypes.Name)?.Value ?? User.FindFirst(ClaimTypes.Email)?.Value ?? "unknown";
+            var roleClaim = User.FindFirst(ClaimTypes.Role)?.Value ?? "unknown";
+
+            _logger.LogInformation("Access granted to {Endpoint} by user {UserId} ({Email}) with role {Role}", endpointName, userIdClaim, emailClaim, roleClaim);
+        }
+
+        private void LogAccessDenied(string endpointName, string reason)
+        {
+            var userIdClaim = User.FindFirst("userId")?.Value ?? "unknown";
+            var emailClaim = User.FindFirst(ClaimTypes.Name)?.Value ?? User.FindFirst(ClaimTypes.Email)?.Value ?? "unknown";
+            var roleClaim = User.FindFirst(ClaimTypes.Role)?.Value ?? "unknown";
+
+            _logger.LogWarning("Access denied to {Endpoint} for user {UserId} ({Email}) with role {Role}: {Reason}", endpointName, userIdClaim, emailClaim, roleClaim, reason);
+        }
+
         // -------------------------
         // CRUD Endpoints
         // -------------------------
@@ -54,6 +74,7 @@ namespace ShopEase.Server.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<User>>> GetUsers()
         {
+            LogAccess(nameof(GetUsers));
             return await _context.Users.ToListAsync();
         }
 
@@ -61,7 +82,13 @@ namespace ShopEase.Server.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<User>> GetUser(int id)
         {
-            if (!IsSelfOrAdmin(id)) return Forbid();
+            if (!IsSelfOrAdmin(id))
+            {
+                LogAccessDenied(nameof(GetUser), "user does not have access to the requested profile");
+                return Forbid();
+            }
+
+            LogAccess(nameof(GetUser));
             var user = await _context.Users.FindAsync(id);
             if (user == null) return NotFound();
             return user;
@@ -90,8 +117,13 @@ namespace ShopEase.Server.Controllers
 
             if (id != user.UserId) return BadRequest();
 
-            if (!IsSelfOrAdmin(id)) return Forbid();
+            if (!IsSelfOrAdmin(id))
+            {
+                LogAccessDenied(nameof(UpdateUser), "user is not allowed to update the requested profile");
+                return Forbid();
+            }
 
+            LogAccess(nameof(UpdateUser));
             _context.Entry(user).State = EntityState.Modified;
             try
             {
@@ -110,7 +142,13 @@ namespace ShopEase.Server.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteUser(int id)
         {
-            if (!IsSelfOrAdmin(id)) return Forbid();
+            if (!IsSelfOrAdmin(id))
+            {
+                LogAccessDenied(nameof(DeleteUser), "user is not allowed to delete the requested profile");
+                return Forbid();
+            }
+
+            LogAccess(nameof(DeleteUser));
             var user = await _context.Users.FindAsync(id);
             if (user == null) return NotFound();
 
@@ -141,6 +179,8 @@ namespace ShopEase.Server.Controllers
                     Role = "Customer"
                 };
 
+            _logger.LogInformation("Registration attempt for user {UserName} ({Email})", request.UserName, request.Email);
+
             user.PasswordHash = _hasher.HashPassword(user, request.Password);
 
             // Default role assignment
@@ -148,6 +188,7 @@ namespace ShopEase.Server.Controllers
 
             _context.Users.Add(user);
             await _context.SaveChangesAsync();  // Save new user to database
+            _logger.LogInformation("Registration succeeded for user {UserName} ({Email})", user.UserName, user.Email);
             return Ok("User registered successfully");  // Return the created user (with UserId) if registration is successful
         }
 
@@ -157,12 +198,11 @@ namespace ShopEase.Server.Controllers
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
             if (user == null)
             {
-                Console.WriteLine($"Login failed: user not found for {request.Email}");
+                _logger.LogWarning("Login failed: no user found for {Email}", request.Email);
                 return Unauthorized("Invalid credentials");
             }
 
-            Console.WriteLine($"Login attempt: {request.Email} / {request.Password}");
-            Console.WriteLine($"Stored hash: {user.PasswordHash}");
+            _logger.LogInformation("Login attempt for {Email}", request.Email);
 
             var result = _hasher.VerifyHashedPassword(user, user.PasswordHash, request.Password);
 
@@ -170,7 +210,7 @@ namespace ShopEase.Server.Controllers
 
             if (result == PasswordVerificationResult.Failed)
             {
-                Console.WriteLine("Password verification failed.");
+                _logger.LogWarning("Login failed: invalid password for {Email}", request.Email);
                 return Unauthorized("Invalid credentials");
             }
 
@@ -219,6 +259,7 @@ namespace ShopEase.Server.Controllers
             _context.RefreshTokens.Add(userToken);
             await _context.SaveChangesAsync();  // save RefreshToken to database
 
+            _logger.LogInformation("Login succeeded for {Email} with role {Role}", user.Email, role);
             return Ok(new LoginResponse     // send both JwtToken and RefreshToken to Login.razor after successful login. Client will store them in localstorage and use them for subsequent requests and token refresh.
             {
                 JwtToken = jwtString,       // this JwtToken containes claims (email, userId and role), issuer, audience, expires, signingCredentials and is signed with the key defined in appsettings.json. This token is sent to client and stored in localstorage with key "jwt".
