@@ -64,6 +64,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseHsts();
 app.UseStaticFiles();
 app.UseBlazorFrameworkFiles();
 app.UseRouting();
