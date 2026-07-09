@@ -24,6 +24,7 @@ public class CartController : ControllerBase
     // ✅ GET: return DTOs, not EF entities
     // Get all cart items for a user
 
+[Authorize]
 [HttpGet]
 public async Task<IActionResult> GetCart()
 {

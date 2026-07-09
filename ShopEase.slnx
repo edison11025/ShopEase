@@ -2,4 +2,5 @@
   <Project Path="ShopEase.Client/ShopEase.Client.csproj" />
   <Project Path="ShopEase.Server/ShopEase.Server.csproj" />
   <Project Path="ShopEase.Shared/ShopEase.Shared.csproj" />
+  <Project Path="ShopEase.Tests/ShopEase.Tests.csproj" />
 </Solution>

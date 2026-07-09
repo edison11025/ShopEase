@@ -33,7 +33,7 @@ namespace ShopEase.Server.Controllers
         }
 
 
-    private bool IsSelfOrAdmin(int targetUserId)
+    private bool IsSelfOrAdmin(int targetUserId)    // Check if the current user is the same as the target user or has an Admin role
 {
     var userIdClaim = User.FindFirst("userId")?.Value;
     var roleClaim = User.FindFirst(ClaimTypes.Role)?.Value;
@@ -129,7 +129,10 @@ namespace ShopEase.Server.Controllers
             if (!ModelState.IsValid)            // ✅ Server-side validation
                 return BadRequest(ModelState);
 
-            var hasher = new PasswordHasher<User>();   
+            var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+            var existingUser = await _context.Users.AnyAsync(u => u.Email.ToLower() == normalizedEmail);
+            if (existingUser)
+                return Conflict("Email already registered");
 
             var user = new User
                 {
@@ -138,7 +141,7 @@ namespace ShopEase.Server.Controllers
                     Role = "Customer"
                 };
 
-            user.PasswordHash = hasher.HashPassword(user, request.Password);
+            user.PasswordHash = _hasher.HashPassword(user, request.Password);
 
             // Default role assignment
             user.Role = "Customer";
@@ -173,6 +176,7 @@ namespace ShopEase.Server.Controllers
 
             var role = string.IsNullOrEmpty(user.Role) ? "User" : user.Role;
 
+            //Payload for JWT - include email, userId and role claims
             var claims = new[]
             {
                 new Claim(JwtRegisteredClaimNames.Sub, user.Email ?? string.Empty),
@@ -181,13 +185,18 @@ namespace ShopEase.Server.Controllers
                 new Claim(ClaimTypes.Name, user.UserName ?? user.Email ?? string.Empty) // ✅ Username for display
             };
 
+            //Get the JWTKey, Issuer and audience from appsettings.json
             var jwtKey = _config["Jwt:Key"] ?? throw new Exception("Jwt:Key missing in appsettings.json");
             var jwtIssuer = _config["Jwt:Issuer"] ?? throw new Exception("Jwt:Issuer missing in appsettings.json");
             var jwtAudience = _config["Jwt:Audience"] ?? throw new Exception("Jwt:Audience missing in appsettings.json");
 
+            // Create symmetric security key from the JWTKey defined in appsettings.json. This key will be used to sign the JWT token and should be kept
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
+            
+            // Sign the token with the key and specify the algorithm
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
+            // Create the JWT token (header, payload, signature) with claims, issuer, audience, expiry and signing credentials
             var jwtToken = new JwtSecurityToken(
                 issuer: jwtIssuer,
                 audience: jwtAudience,
@@ -195,6 +204,7 @@ namespace ShopEase.Server.Controllers
                 expires: DateTime.Now.AddMinutes(30),
                 signingCredentials: creds);
 
+            // Encode JWT token (header, payload, and signature) then serialize the JWT token to a string to send to client. This token will be stored in localstorage on client side and sent in Authorization header for subsequent requests
             var jwtString = new JwtSecurityTokenHandler().WriteToken(jwtToken);
 
             var refreshToken = Guid.NewGuid().ToString();
