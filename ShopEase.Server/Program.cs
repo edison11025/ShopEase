@@ -15,6 +15,9 @@ builder.Services.AddDbContext<ShopDbContext>(options =>
         new MySqlServerVersion(new Version(8, 0, 36))));
 builder.Services.AddControllers();
 
+// Add in-memory cache
+builder.Services.AddMemoryCache();
+
 // Register PasswordHasher<User> for DI
 builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
 

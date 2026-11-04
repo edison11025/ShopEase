@@ -4,6 +4,7 @@ using ShopEase.Server.Data;
 using ShopEase.Shared.Models;         
 using Microsoft.AspNetCore.Authorization; 
 using ShopEase.Shared.DTOs;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace ShopEase.Server.Controllers
 {
@@ -12,20 +13,43 @@ namespace ShopEase.Server.Controllers
     public class ProductsController : ControllerBase
     {
         private readonly ShopDbContext _context;
+        private readonly IMemoryCache _cache;
+        private readonly ILogger<ProductsController> _logger;
 
-        public ProductsController(ShopDbContext context)
+        private const string ProductsCacheKey = "products";
+        public ProductsController(ShopDbContext context, IMemoryCache cache, ILogger<ProductsController> logger)
         {
             _context = context;
+            _cache = cache;
+            _logger = logger;
         }
 
         // -------------------------
         // Public: Get all products
         // -------------------------
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Product>>> GetProducts()
-        {
-            return await _context.Products.ToListAsync();
-        }
+public async Task<ActionResult<IEnumerable<Product>>> GetProducts()
+{
+    
+
+    if (!_cache.TryGetValue(ProductsCacheKey, out List<Product>? products))
+    {
+        _logger.LogInformation("Fetching products from database.");
+
+        products = await _context.Products.ToListAsync();
+
+        var cacheOptions = new MemoryCacheEntryOptions()
+            .SetAbsoluteExpiration(TimeSpan.FromMinutes(5));
+
+        _cache.Set(ProductsCacheKey, products, cacheOptions);
+    }
+    else
+    {
+        _logger.LogInformation("Fetching products from cache.");
+    }
+
+    return Ok(products);
+}
 
         // -------------------------
         // Public: Get product by id
@@ -53,6 +77,9 @@ namespace ShopEase.Server.Controllers
             _context.Products.Add(product);
             await _context.SaveChangesAsync();
 
+            _cache.Remove(ProductsCacheKey); // Invalidate cache after adding a new product
+            _logger.LogInformation("Product cache invalidated after product creation.");
+
             return CreatedAtAction(nameof(GetProductById), new { id = product.ProductId }, product);
         }
 
@@ -71,6 +98,9 @@ namespace ShopEase.Server.Controllers
             try
             {
                 await _context.SaveChangesAsync();
+
+                _cache.Remove(ProductsCacheKey); // Invalidate cache after updating a product
+                _logger.LogInformation("Product cache invalidated after product update.");
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -96,6 +126,9 @@ namespace ShopEase.Server.Controllers
 
             _context.Products.Remove(product);
             await _context.SaveChangesAsync();
+
+            _cache.Remove(ProductsCacheKey); // Invalidate cache after deleting a product
+            _logger.LogInformation("Product cache invalidated after product deletion.");
 
             return NoContent();
         }
