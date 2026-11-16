@@ -5,51 +5,30 @@ using ShopEase.Shared.Models;
 using Microsoft.AspNetCore.Authorization; 
 using ShopEase.Shared.DTOs;
 using Microsoft.Extensions.Caching.Memory;
+using ShopEase.Server.Services;
 
 namespace ShopEase.Server.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
     public class ProductsController : ControllerBase
-    {
-        private readonly ShopDbContext _context;
-        private readonly IMemoryCache _cache;
-        private readonly ILogger<ProductsController> _logger;
+    {        
+        private readonly IProductService _productService;
 
-        private const string ProductsCacheKey = "products";
-        public ProductsController(ShopDbContext context, IMemoryCache cache, ILogger<ProductsController> logger)
+        public ProductsController(IProductService productService)
         {
-            _context = context;
-            _cache = cache;
-            _logger = logger;
+            _productService = productService;
         }
 
         // -------------------------
         // Public: Get all products
         // -------------------------
         [HttpGet]
-public async Task<ActionResult<IEnumerable<Product>>> GetProducts()
-{
-    
-
-    if (!_cache.TryGetValue(ProductsCacheKey, out List<Product>? products))
-    {
-        _logger.LogInformation("Fetching products from database.");
-
-        products = await _context.Products.ToListAsync();
-
-        var cacheOptions = new MemoryCacheEntryOptions()
-            .SetAbsoluteExpiration(TimeSpan.FromMinutes(5));
-
-        _cache.Set(ProductsCacheKey, products, cacheOptions);
-    }
-    else
-    {
-        _logger.LogInformation("Fetching products from cache.");
-    }
-
-    return Ok(products);
-}
+        public async Task<ActionResult<IEnumerable<Product>>> GetProducts()
+        {  
+            var products = await _productService.GetProductsAsync();
+            return Ok(products);
+        }
 
         // -------------------------
         // Public: Get product by id
@@ -57,11 +36,11 @@ public async Task<ActionResult<IEnumerable<Product>>> GetProducts()
         [HttpGet("{id}")]
         public async Task<ActionResult<Product>> GetProductById(int id)
         {
-            var product = await _context.Products.FindAsync(id);
+            var product = await _productService.GetProductByIdAsync(id);
             if (product == null)
                 return NotFound();
 
-            return product;
+            return Ok (product);
         }
 
         // -------------------------
@@ -74,11 +53,7 @@ public async Task<ActionResult<IEnumerable<Product>>> GetProducts()
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            _context.Products.Add(product);
-            await _context.SaveChangesAsync();
-
-            _cache.Remove(ProductsCacheKey); // Invalidate cache after adding a new product
-            _logger.LogInformation("Product cache invalidated after product creation.");
+           product = await _productService.AddProductAsync(product);
 
             return CreatedAtAction(nameof(GetProductById), new { id = product.ProductId }, product);
         }
@@ -92,25 +67,12 @@ public async Task<ActionResult<IEnumerable<Product>>> GetProducts()
         {
             if (id != product.ProductId)
                 return BadRequest();
-
-            _context.Entry(product).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-
-                _cache.Remove(ProductsCacheKey); // Invalidate cache after updating a product
-                _logger.LogInformation("Product cache invalidated after product update.");
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!_context.Products.Any(e => e.ProductId == id))
-                    return NotFound();
-                else
-                    throw;
-            }
-
-            return NoContent();
+             var updatedProduct =
+            await _productService.UpdateProductAsync(product);
+                if (updatedProduct == null)
+                return NotFound();
+            
+            return NoContent();     // in the future we can change into : return Ok(updatedProduct);
         }
 
         // -------------------------
@@ -120,15 +82,9 @@ public async Task<ActionResult<IEnumerable<Product>>> GetProducts()
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteProduct(int id)
         {
-            var product = await _context.Products.FindAsync(id);
-            if (product == null)
+            var deleted = await _productService.DeleteProductAsync(id);
+            if (!deleted)
                 return NotFound();
-
-            _context.Products.Remove(product);
-            await _context.SaveChangesAsync();
-
-            _cache.Remove(ProductsCacheKey); // Invalidate cache after deleting a product
-            _logger.LogInformation("Product cache invalidated after product deletion.");
 
             return NoContent();
         }

@@ -5,6 +5,7 @@ using ShopEase.Shared.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using ShopEase.Server.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,7 +15,7 @@ builder.Services.AddDbContext<ShopDbContext>(options =>
     options.UseMySql(builder.Configuration.GetConnectionString("DefaultConnection"),
         new MySqlServerVersion(new Version(8, 0, 36))));
 builder.Services.AddControllers();
-
+builder.Services.AddScoped<IProductService, ProductService>();
 // Add in-memory cache
 builder.Services.AddMemoryCache();
 
