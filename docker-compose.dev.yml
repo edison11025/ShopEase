@@ -5,8 +5,8 @@ services:
     container_name: mysql
 
     environment:
-      MYSQL_ROOT_PASSWORD: b1494nzhh1712sc
-      MYSQL_DATABASE: ShopEaseDb
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
 
     ports:
       - "3307:3306"
