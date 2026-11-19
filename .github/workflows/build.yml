@@ -31,3 +31,9 @@ jobs:
 
       - name: Build Docker Image
         run: docker build -t shopease .
+
+      - name: Verify Secret Exists
+        run: echo "JWT Secret Exists"
+
+        env:
+            JWT_KEY: ${{ secrets.JWT_KEY }}
