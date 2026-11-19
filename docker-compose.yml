@@ -1,0 +1,39 @@
+services:
+
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
+
+    environment:
+      MYSQL_ROOT_PASSWORD: b1494nzhh1712sc
+      MYSQL_DATABASE: ShopEaseDb
+
+    ports:
+      - "3307:3306"
+
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+  redis:
+    image: redis
+    container_name: redis
+
+    ports:
+      - "6379:6379"
+
+  shopease:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: shopease
+
+    depends_on:
+      - mysql
+      - redis
+
+    ports:
+      - "8080:8080"
+
+volumes:
+  mysql-data:

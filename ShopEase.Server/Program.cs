@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using ShopEase.Server.Services;
+using Microsoft.Extensions.Caching.Distributed;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,6 +19,11 @@ builder.Services.AddControllers();
 builder.Services.AddScoped<IProductService, ProductService>();
 // Add in-memory cache
 builder.Services.AddMemoryCache();
+
+builder.Services.AddStackExchangeRedisCache(options =>
+{
+    options.Configuration = builder.Configuration.GetConnectionString("Redis");
+});
 
 // Register PasswordHasher<User> for DI
 builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();

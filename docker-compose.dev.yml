@@ -1,0 +1,44 @@
+services:
+
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
+
+    environment:
+      MYSQL_ROOT_PASSWORD: b1494nzhh1712sc
+      MYSQL_DATABASE: ShopEaseDb
+
+    ports:
+      - "3307:3306"
+
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+  redis:
+    image: redis
+    container_name: redis
+
+    ports:
+      - "6379:6379"
+
+  shopease:
+    image: mcr.microsoft.com/dotnet/sdk:10.0
+
+    container_name: shopease
+
+    working_dir: /src
+
+    command: dotnet watch run --project ShopEase.Server
+
+    depends_on:
+      - mysql
+      - redis
+
+    ports:
+      - "8080:8080"
+
+    volumes:
+      - ./:/src
+
+volumes:
+  mysql-data:

@@ -11,19 +11,11 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 
 // 🔹 Register HttpClient
 builder.Services.AddScoped(sp =>
-{
-    var baseAddress = builder.HostEnvironment.BaseAddress;
-
-    if (!baseAddress.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+    new HttpClient
     {
-        baseAddress = baseAddress.Replace("http://", "https://", StringComparison.OrdinalIgnoreCase);
-    }
-
-    return new HttpClient
-    {
-        BaseAddress = new Uri(baseAddress)
-    };
-});
+        BaseAddress = new Uri(
+            builder.HostEnvironment.BaseAddress)
+    });
 
 // 🔹 Register LocalStorage
 builder.Services.AddBlazoredLocalStorage();

@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using ShopEase.Server.Data;
 using ShopEase.Shared.Models;
+using Microsoft.Extensions.Caching.Distributed;
+using System.Text.Json;
 
 namespace ShopEase.Server.Services
 {
@@ -9,6 +11,7 @@ namespace ShopEase.Server.Services
     {
         private readonly ShopDbContext _context;
         private readonly IMemoryCache _cache;
+        private readonly IDistributedCache _redisCache;
         private readonly ILogger<ProductService> _logger;
 
         private const string ProductsCacheKey = "products";
@@ -16,43 +19,52 @@ namespace ShopEase.Server.Services
         public ProductService(
             ShopDbContext context,
             IMemoryCache cache,
+            IDistributedCache redisCache,
             ILogger<ProductService> logger)
         {
             _context = context;
             _cache = cache;
             _logger = logger;
+            _redisCache = redisCache;
         }
 
         public async Task<List<Product>> GetProductsAsync()
-        {
-            if (!_cache.TryGetValue(
-                    ProductsCacheKey,
-                    out List<Product>? products))
-            {
-                _logger.LogInformation(
-                    "Fetching products from database.");
+{
+    var cachedProducts =
+        await _redisCache.GetStringAsync(
+            ProductsCacheKey);
 
-                products = await _context.Products
-                    .AsNoTracking()      
-                    .ToListAsync();
+    if (!string.IsNullOrEmpty(cachedProducts))
+    {
+        _logger.LogInformation(
+            "Fetching products from Redis cache.");
 
-                var cacheOptions = new MemoryCacheEntryOptions()
-                    .SetSlidingExpiration(TimeSpan.FromMinutes(5));
+        return JsonSerializer.Deserialize<List<Product>>(
+            cachedProducts)!;
+    }
 
-                _cache.Set(
-                    ProductsCacheKey,
-                    products,
-                    cacheOptions);
-            }
-            else
-            {
-                _logger.LogInformation(
-                    "Fetching products from cache.");
-            }
+    _logger.LogInformation(
+        "Fetching products from database.");
 
-            return products!;
-        }
+    var products = await _context.Products
+        .AsNoTracking()
+        .ToListAsync();
 
+    var cacheOptions =
+        new DistributedCacheEntryOptions()
+            .SetSlidingExpiration(
+                TimeSpan.FromMinutes(5));
+
+    var json =
+        JsonSerializer.Serialize(products);
+
+    await _redisCache.SetStringAsync(
+        ProductsCacheKey,
+        json,
+        cacheOptions);
+
+    return products;
+}
         public async Task<Product?> GetProductByIdAsync(int id)
         {
             return await _context.Products
@@ -102,7 +114,7 @@ namespace ShopEase.Server.Services
 
     private void InvalidateProductsCache()
 {
-    _cache.Remove(ProductsCacheKey);
+    _redisCache.Remove(ProductsCacheKey);
     _logger.LogInformation(
         "Products cache invalidated.");
 }
