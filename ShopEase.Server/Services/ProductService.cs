@@ -53,7 +53,7 @@ namespace ShopEase.Server.Services
     var cacheOptions =
         new DistributedCacheEntryOptions()
             .SetSlidingExpiration(
-                TimeSpan.FromMinutes(5));
+                TimeSpan.FromMinutes(10));
 
     var json =
         JsonSerializer.Serialize(products);
