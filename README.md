@@ -59,3 +59,4 @@ The database is seeded with two products so you can test immediately:
 - **Coffee Mug** (Kitchenware) → `images/mug.png`
 
 ---
+20-11-2026 12.38 Update Docker Repo Read and Write 
